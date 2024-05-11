@@ -26,8 +26,8 @@ contract SwapToken is Ownable {
     );
 
     function _setRate(address _tokenA, address _tokenB, uint256 _rate) internal onlyOwner() {
-        rates[_tokenA][_tokenB] = _rate;
-        rates[_tokenB][_tokenA] = 1 / _rate;
+        rates[_tokenA][_tokenB] = _rate * 1e18;
+        rates[_tokenB][_tokenA] = 1e18 / _rate;
 
         emit SetRate(_tokenA, _tokenB, _rate);
     }
@@ -37,7 +37,7 @@ contract SwapToken is Ownable {
         require(_amount > 0, "Amount must be greater than 0");
 
         uint256 rate = _getRate(_tokenA, _tokenB);
-        uint256 amountOut = _amount * rate;
+        uint256 amountOut = _amount * rate / 1e18;
 
         _handleAmountIn(_tokenA, _amount);
         _handleAmountOut(_tokenB, amountOut);
