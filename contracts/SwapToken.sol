@@ -25,24 +25,32 @@ contract SwapToken is Ownable {
         uint256 _newRate
     );
 
-    function _setRate(address _tokenA, address _tokenB, uint256 _rate) internal onlyOwner() {
+    function setRate(address _tokenA, address _tokenB, uint256 _rate) external onlyOwner() {
         rates[_tokenA][_tokenB] = _rate * 1e18;
         rates[_tokenB][_tokenA] = 1e18 / _rate;
 
         emit SetRate(_tokenA, _tokenB, _rate);
     }
 
+    function getRate(address _tokenA, address _tokenB) public view returns(uint256) {
+        return rates[_tokenA][_tokenB];
+    }
+
     function swap(address _tokenA, address _tokenB, uint256 _amount) external payable {
         require(_tokenA != _tokenB, "Swap token must be difference");
         require(_amount > 0, "Amount must be greater than 0");
 
-        uint256 rate = _getRate(_tokenA, _tokenB);
+        uint256 rate = getRate(_tokenA, _tokenB);
         uint256 amountOut = _amount * rate / 1e18;
 
         _handleAmountIn(_tokenA, _amount);
         _handleAmountOut(_tokenB, amountOut);
 
         emit Swap(msg.sender, _tokenA, _tokenB, _amount, amountOut, rate);
+    }
+
+    function deposit(address _token, uint256 _amount) external payable {
+        _handleAmountIn(_token, _amount);
     }
 
     function _handleAmountIn(address _token, uint256 _amount) internal {
@@ -64,9 +72,5 @@ contract SwapToken is Ownable {
 
     function _isNativeToken(address _token) internal pure returns(bool) {
         return _token == address(0);
-    }
-
-    function _getRate(address _tokenA, address _tokenB) internal view returns(uint256) {
-        return rates[_tokenA][_tokenB];
     }
 }
