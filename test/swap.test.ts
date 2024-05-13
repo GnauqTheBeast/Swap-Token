@@ -16,26 +16,32 @@ describe("SwapToken", async function () {
         const swapTokenContract = await SwapTokenContract.deploy();
 
         const TOKEN = await ethers.getContractFactory("Token");
-        const [deployer, address1, address2] = await ethers.getSigners();
+        const [deployer, user1, user2] = await ethers.getSigners();
         const token = await TOKEN.deploy(name, symbol, toWei(supply));
 
         const handsomeToken = await TOKEN.deploy("handsome", "HAS", toWei(supply));
         const talentToken = await TOKEN.deploy("talent", "TAL", toWei(supply));
         const passionToken = await TOKEN.deploy("passion", "PAS", toWei(supply));
 
+        // ready to transfer
         await handsomeToken.connect(deployer).approve(await swapTokenContract.getAddress(), toWei(supply));
         await talentToken.connect(deployer).approve(await swapTokenContract.getAddress(), toWei(supply));
         await passionToken.connect(deployer).approve(await swapTokenContract.getAddress(), toWei(supply));
-        await handsomeToken.connect(address1).approve(await swapTokenContract.getAddress(), toWei(5 * 10**6));
-        await talentToken.connect(address1).approve(await swapTokenContract.getAddress(), toWei(5 * 10**6));
-        await handsomeToken.connect(deployer).transfer(await address1.getAddress(), toWei(5 * 10**6));
-        await talentToken.connect(deployer).transfer(await address1.getAddress(), toWei(5 * 10**6));
+        await handsomeToken.connect(user1).approve(await swapTokenContract.getAddress(), toWei(6 * 1e6));
+        await talentToken.connect(user1).approve(await swapTokenContract.getAddress(), toWei(6 * 1e6));
+        // give user money 
+        await handsomeToken.connect(deployer).transfer(await user1.getAddress(), toWei(6 * 1e6));
+        // await talentToken.connect(deployer).transfer(await user1.getAddress(), toWei(6 * 1e6));
+
+        // give contract money
+        await handsomeToken.connect(deployer).transfer(await swapTokenContract.getAddress(), toWei(6 * 1e6));
+        await talentToken.connect(deployer).transfer(await swapTokenContract.getAddress(), toWei(6 * 1e6));
 
         return {
             swapTokenContract,
             deployer,
-            address1, 
-            address2,
+            user1, 
+            user2,
             token,
             handsomeToken,
             talentToken,
@@ -73,51 +79,54 @@ describe("SwapToken", async function () {
         })
     });
 
-    describe("Swap Token", async function () {
-        this.beforeEach(async () => {
-            const { swapTokenContract, deployer, address1, handsomeToken, talentToken } = await loadFixture(deployContract);
-            const amountIn = 1000;
+    describe("Check deposit token", async function () {
+        it("check deposit erc20 token", async () => {
+            const { swapTokenContract, user1, handsomeToken } = await loadFixture(deployContract);
 
-            await swapTokenContract.connect(deployer).deposit(nativeToken, toWei(amountIn), {
-                value: toWei(amountIn),
-              });
-            await swapTokenContract.connect(deployer).deposit(handsomeToken, toWei(amountIn));
-            await swapTokenContract.connect(deployer).deposit(talentToken, toWei(amountIn));
+            const amountDeposit = 3e6;
+            const user1Adress = await user1.getAddress();
 
-            await swapTokenContract.connect(address1).deposit(handsomeToken, toWei(amountIn));
-            await swapTokenContract.connect(address1).deposit(talentToken, toWei(amountIn));
+            await swapTokenContract.connect(user1).deposit(handsomeToken, toWei(amountDeposit));
+            expect(await handsomeToken.balanceOf(user1Adress)).to.equal(toWei(amountDeposit));
         })
-        it("Check swap token", async () => {
-            const { swapTokenContract, deployer, address1, handsomeToken, talentToken } = await loadFixture(deployContract);
-            const HASHToTALRate = 2;
-            await swapTokenContract.connect(deployer).setRate(handsomeToken, talentToken, HASHToTALRate);
-            const rate = Number(await swapTokenContract.connect(deployer).getRate(handsomeToken, talentToken));
+    })
 
-            const user1Adress = await address1.getAddress();
+    describe("Swap Token", async function () {
+        // beforeEach(async () => {
+        //     const { swapTokenContract, deployer, address1, handsomeToken, talentToken } = await loadFixture(deployContract);
+                         
+        //     const amountDeposit = 3e6;
 
+        //     await swapTokenContract.connect(deployer).deposit(handsomeToken, toWei(amountDeposit));
+        //     await swapTokenContract.connect(deployer).deposit(talentToken, toWei(amountDeposit));
+
+        //     await swapTokenContract.connect(address1).deposit(handsomeToken, toWei(amountDeposit));
+        //     await swapTokenContract.connect(address1).deposit(talentToken, toWei(amountDeposit));
+        // });
+
+        it("Check swap token to token", async () => {
+            const { swapTokenContract, deployer, user1, handsomeToken, talentToken } = await loadFixture(deployContract);
+            const HASToTALRate = 2;
+            await swapTokenContract.connect(deployer).setRate(handsomeToken, talentToken, HASToTALRate);
+
+            const user1Adress = await user1.getAddress();
             const HAS_Address = await handsomeToken.getAddress();
             const TAL_Address = await talentToken.getAddress();
 
-            const amountIn = 10;
-            await swapTokenContract.connect(deployer).deposit(nativeToken, toWei(amountIn), {
-                value: toWei(amountIn),
-              });
-            await swapTokenContract.connect(deployer).deposit(handsomeToken, toWei(amountIn));
-            await swapTokenContract.connect(deployer).deposit(talentToken, toWei(amountIn));
+            // Swap 
+            const amountIn = 1e3;
+            const amountOut = amountIn * HASToTALRate;
+            const balanceBeforeHAS = Number(await handsomeToken.balanceOf(user1Adress));
+            const balanceBeforeTAL = Number(await talentToken.balanceOf(user1Adress));
+            await swapTokenContract.connect(user1).swap(HAS_Address, TAL_Address, toWei(amountIn));
+            const balanceAfterHAS = Number(await handsomeToken.balanceOf(user1Adress));
+            const balanceAfterTAL = Number(await talentToken.balanceOf(user1Adress)); 
 
-            await swapTokenContract.connect(address1).deposit(handsomeToken, toWei(amountIn));
-            await swapTokenContract.connect(address1).deposit(talentToken, toWei(amountIn));
+            console.log("HAS: Before, After", balanceBeforeHAS, balanceAfterHAS);
+            console.log("TAL: Before, After", balanceBeforeTAL, balanceAfterTAL);
 
-            // const amountIn = 10;
-            const balanceHASBefore = await handsomeToken.balanceOf(user1Adress);
-
-            const balanceTALBefore = await talentToken.balanceOf(user1Adress);
-            await swapTokenContract.connect(address1).swap(HAS_Address, TAL_Address, toWei(amountIn));
-            const balanceHASAfter = Number(await handsomeToken.balanceOf(user1Adress));
-            const balanceTALAfter = Number(await talentToken.balanceOf(user1Adress)); 
-
-
-            expect(Number(balanceHASBefore - toWei(amountIn))).to.equal(balanceHASAfter)
+            expect(balanceBeforeHAS - Number(toWei(amountIn))).to.equal(balanceAfterHAS);
+            expect(balanceBeforeTAL + Number(toWei(amountOut))).to.equal(balanceAfterTAL)
         })
     })
 })

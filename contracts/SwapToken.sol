@@ -53,6 +53,10 @@ contract SwapToken is Ownable {
         _handleAmountIn(_token, _amount);
     }
 
+    function withdraw(address _token, uint256 _amount) external payable {
+        _handleAmountOut(_token, _amount);   
+    }
+
     function _handleAmountIn(address _token, uint256 _amount) internal {
         if (_isNativeToken(_token)) {
             require(_amount == msg.value, "Amount in must be equal to msg.value");
