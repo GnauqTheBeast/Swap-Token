@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract SwapToken is Ownable {
     mapping(address => mapping(address => uint256)) private rates;
+    mapping(address => mapping(address => uint256)) private safe;
 
     constructor() Ownable(msg.sender) {}
 
@@ -24,6 +25,11 @@ contract SwapToken is Ownable {
         address indexed _tokenB,
         uint256 _newRate
     );
+
+    modifier onlyOwnerOf(address _user, address _token) {
+        require(safe[_user][_token] != 0, "You have no token in the bank");
+        _;
+    }
 
     function setRate(address _tokenA, address _tokenB, uint256 _rate) external onlyOwner() {
         rates[_tokenA][_tokenB] = _rate * 1e18;
@@ -50,10 +56,13 @@ contract SwapToken is Ownable {
     }
 
     function deposit(address _token, uint256 _amount) external payable {
+        _saveDepositToken(msg.sender, _token, _amount);
         _handleAmountIn(_token, _amount);
     }
 
-    function withdraw(address _token, uint256 _amount) external payable {
+    function withdraw(address _token, uint256 _amount) external payable onlyOwnerOf(msg.sender, _token) {
+        require(safe[msg.sender][_token] >= _amount, "Not enough funds to withdraw");
+        safe[msg.sender][_token] -= _amount;
         _handleAmountOut(_token, _amount);   
     }
 
@@ -76,5 +85,13 @@ contract SwapToken is Ownable {
 
     function _isNativeToken(address _token) internal pure returns(bool) {
         return _token == address(0);
+    }
+
+    function _saveDepositToken(address _user, address _token, uint256 _amount) private {
+        safe[_user][_token] = _amount;
+    }
+
+    function getSavedToken(address _token) external view returns(uint256) {
+        return safe[msg.sender][_token];
     }
 }
